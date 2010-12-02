@@ -334,9 +334,21 @@ int fb_device_open(hw_module_t const* module, const char* name,
         status = mapFrameBuffer(m);
         if (status >= 0) {
             int stride = m->finfo.line_length / (m->info.bits_per_pixel >> 3);
-            int format = (m->info.bits_per_pixel == 32)
-                         ? HAL_PIXEL_FORMAT_RGBX_8888
-                         : HAL_PIXEL_FORMAT_RGB_565;
+            /*
+             * Auto detect current depth and select mode
+             */
+            int format;
+            if (m->info.bits_per_pixel == 32) {
+                format = (m->info.red.offset == 16) ? HAL_PIXEL_FORMAT_BGRA_8888
+                       : (m->info.red.offset == 24) ? HAL_PIXEL_FORMAT_RGBA_8888
+                       : HAL_PIXEL_FORMAT_RGBX_8888;
+            } else if (m->info.bits_per_pixel == 16) {
+                format = (m->info.green.length == 6) ?
+                         HAL_PIXEL_FORMAT_RGB_565 : HAL_PIXEL_FORMAT_RGBA_5551;
+            } else {
+                LOGE("Unsupported format %d", m->info.bits_per_pixel);
+                return -EINVAL;
+            }
             const_cast<uint32_t&>(dev->device.flags) = 0;
             const_cast<uint32_t&>(dev->device.width) = m->info.xres;
             const_cast<uint32_t&>(dev->device.height) = m->info.yres;
