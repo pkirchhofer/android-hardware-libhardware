@@ -121,7 +121,7 @@ int hw_get_module_by_class(const char *class_id, const char *inst,
                            const struct hw_module_t **module)
 {
     int status;
-    int i;
+    int i = 0;
     const struct hw_module_t *hmi = NULL;
     char prop[PATH_MAX];
     char path[PATH_MAX];
@@ -133,6 +133,14 @@ int hw_get_module_by_class(const char *class_id, const char *inst,
         strlcpy(name, class_id, PATH_MAX);
 
     /*
+     * A dirty hack to disable hardware gralloc
+     */
+    if (strcmp("gralloc", class_id) == 0) {
+        if (property_get("debug.egl.hw", prop, NULL) && (prop[0] == '0'))
+            i = HAL_VARIANT_KEYS_COUNT;
+    }
+
+    /*
      * Here we rely on the fact that calling dlopen multiple times on
      * the same .so will simply increment a refcount (and not load
      * a new copy of the library).
@@ -140,7 +148,7 @@ int hw_get_module_by_class(const char *class_id, const char *inst,
      */
 
     /* Loop through the configuration variants looking for a module */
-    for (i=0 ; i<HAL_VARIANT_KEYS_COUNT+1 ; i++) {
+    for ( ; i<HAL_VARIANT_KEYS_COUNT+1 ; i++) {
         if (i < HAL_VARIANT_KEYS_COUNT) {
             if (property_get(variant_keys[i], prop, NULL) == 0) {
                 continue;
