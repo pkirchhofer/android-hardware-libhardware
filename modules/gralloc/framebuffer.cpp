@@ -97,9 +97,7 @@ static int fb_post(struct framebuffer_device_t* dev, buffer_handle_t buffer)
         const size_t offset = hnd->base - m->framebuffer->base;
         m->info.activate = FB_ACTIVATE_VBL;
         m->info.yoffset = offset / m->finfo.line_length;
-        LOGI("[GRALLOC] Doing FBIOPUT_VSCREENINFO");
         if (ioctl(m->framebuffer->fd, FBIOPUT_VSCREENINFO, &m->info) == -1) {
-            LOGE("FBIOPUT_VSCREENINFO failed");
             m->base.unlock(&m->base, buffer); 
             return -errno;
         }
@@ -122,21 +120,14 @@ static int fb_post(struct framebuffer_device_t* dev, buffer_handle_t buffer)
                 0, 0, m->info.xres, m->info.yres,
                 &buffer_vaddr);
 
-        LOGI("[GRALLOC] Doing memcpy");
-        LOGI("[GRALLOC] m->finfo.line_length %d m->info.yres %d m->info.xres %d", m->finfo.line_length, m->info.yres, m->info.xres);
-        //memcpy(fb_vaddr, buffer_vaddr, m->finfo.line_length * m->info.yres);
-
         uint8_t* in8 = (uint8_t*) buffer_vaddr - 10 * m->finfo.line_length;
         uint8_t* out8 = (uint8_t*) fb_vaddr;
-        //uint16_t* inbuf = (uint16_t*) buffer_vaddr;
-        //uint16_t* outbuf = (uint16_t*) fb_vaddr;
         uint16_t width = m->info.xres;
         uint16_t half_width = width / 2;
         uint16_t height = m->info.yres;
         uint16_t row_cnt, pix_cnt;
         uint32_t row_start;
         uint32_t offset = half_width + 16; // in pixels
-        //uint32_t copied = 0;
 
         // Copy left side to right side
         for (row_cnt = 1; row_cnt < height; row_cnt++) {
@@ -144,12 +135,6 @@ static int fb_post(struct framebuffer_device_t* dev, buffer_handle_t buffer)
             void* in = in8 + start_offset;
             void* out = out8 + start_offset + (width - offset) * 2 - 1 * m->finfo.line_length;
             memcpy(out, in, offset * 2);
-            //copied += offset * 2;
-
-            //row_start = row_cnt * width;
-            //for (pix_cnt = 0; pix_cnt < offset; pix_cnt++) {
-            //    outbuf[row_start + pix_cnt + (width - offset)] = inbuf[row_start + pix_cnt];
-            //}
         }
 
         // Copy right side to left side
@@ -158,63 +143,8 @@ static int fb_post(struct framebuffer_device_t* dev, buffer_handle_t buffer)
             void* in = in8 + start_offset + offset * 2;
             void* out = out8 + start_offset + 0 * m->finfo.line_length;
             memcpy(out, in, (width - offset) * 2);
-            //copied += (width - offset) * 2;
-
-            //row_start = row_cnt * width;
-            //for (pix_cnt = offset; pix_cnt < width; pix_cnt++) {
-            //    outbuf[row_start + pix_cnt - offset] = inbuf[row_start + pix_cnt];
-            //}
         }
 
-/*
-        uint16_t* inbuf = (uint16_t*) buffer_vaddr;
-        uint32_t* outbuf = (uint32_t*) fb_vaddr;
-        uint16_t row_cnt, pix_cnt;
-        uint16_t width = m->info.xres;
-        uint16_t height = m->info.yres;
-        uint32_t row_start;
-
-        // 16 Bit Input
-        uint16_t in;
-
-        // 32 Bit Output
-        uint8_t A_in, R_in, G_in, B_in, A_out, R_out, G_out, B_out;
-
-        //#define MODE565
-        #define MODE555
-
-        for (row_cnt = 0; row_cnt < height; row_cnt++) {
-            row_start = row_cnt * width;
-
-            for (pix_cnt = 0; pix_cnt < width; pix_cnt++) {
-                 in = inbuf[row_start + pix_cnt];
-
-#ifdef MODE565   // 565
-                 A_in = 0;
-                 B_in = (in >> 11) & 0x1F;
-                 G_in = (in >> 5) & 0x3F;
-#else            // 555
-                 A_in = (in >> 15) & 0x01;
-                 B_in = (in >> 10) & 0x1F;
-                 G_in = (in >> 5) & 0x1F;
-#endif
-                 R_in = in & 0x1F;
-
-#ifdef MODE565   // 565
-                 A_out = 0xFF000000;
-                 G_out = (G_in * 529 + 33) >> 6;
-#else            // 555
-                 A_out = (A_in) ? 0xFF : 0x00;
-                 G_out = (G_in * 527 + 23) >> 6;
-#endif
-                 R_out = (R_in * 527 + 23) >> 6;
-                 B_out = (B_in * 527 + 23) >> 6;
-
-                 outbuf[row_start + pix_cnt] = A_out << 24 | R_out << 16 | G_out << 8 | B_out;
-            }
-       }
-*/
-        
         m->base.unlock(&m->base, buffer); 
         m->base.unlock(&m->base, m->framebuffer); 
     }
@@ -276,10 +206,7 @@ int mapFrameBufferLocked(struct private_module_t* module)
     /*
      * Request NUM_BUFFERS screens (at lest 2 for page flipping)
      */
-    LOGI("1 yres = %d yres_virtual = %d", info.yres, info.yres_virtual);
     info.yres_virtual = info.yres * NUM_BUFFERS;
-    //info.yres = info.yres_virtual / 2;
-    LOGI("2 yres = %d yres_virtual = %d", info.yres, info.yres_virtual);
 
     uint32_t flags = PAGE_FLIP;
     if (ioctl(fd, FBIOPUT_VSCREENINFO, &info) == -1) {
@@ -288,8 +215,6 @@ int mapFrameBufferLocked(struct private_module_t* module)
         LOGW("FBIOPUT_VSCREENINFO failed, page flipping not supported");
     }
 
-    //info.yres = info.yres_virtual / 2;
-    LOGI("3 yres = %d yres_virtual = %d", info.yres, info.yres_virtual);
     if (info.yres_virtual < info.yres * 2) {
         // we need at least 2 for page-flipping
         info.yres_virtual = info.yres;
@@ -300,8 +225,6 @@ int mapFrameBufferLocked(struct private_module_t* module)
 
     if (ioctl(fd, FBIOGET_VSCREENINFO, &info) == -1)
         return -errno;
-    //info.yres = info.yres_virtual / 2;
-    LOGI("4 yres = %d yres_virtual = %d", info.yres, info.yres_virtual);
 
     uint64_t  refreshQuotient =
     (
@@ -329,16 +252,6 @@ int mapFrameBufferLocked(struct private_module_t* module)
     float xdpi = (info.xres * 25.4f) / info.width;
     float ydpi = (info.yres * 25.4f) / info.height;
     float fps  = refreshRate / 1000.0f;
-
-    info.bits_per_pixel = 16;
-    info.red.offset     = 11;
-    info.red.length     = 5;
-    info.green.offset   = 5;
-    info.green.length   = 6;
-    info.blue.offset    = 0;
-    info.blue.length    = 5;
-    info.transp.offset  = 0;
-    info.transp.length  = 0;
 
     LOGI(   "using (fd=%d)\n"
             "id           = %s\n"
@@ -398,7 +311,6 @@ int mapFrameBufferLocked(struct private_module_t* module)
             module->framebuffer = new private_handle_t(dup(fd), fbSize, 0);
             module->framebuffer->base = intptr_t(vaddr);
             memset(vaddr, 0, fbSize);
-            LOGI("using %d buffers", module->numBuffers);
             return 0;
         }
 
@@ -466,26 +378,14 @@ int fb_device_open(hw_module_t const* module, const char* name,
              * Auto detect current depth and select mode
              */
             int format;
-            //m->info.bits_per_pixel = 16;
-            //m->info.green.length = 6;
-            //m->info.red.length = 6;
-            //m->info.blue.length = 6;
             if (m->info.bits_per_pixel == 32) {
-                LOGI("[GRALLOC] HAL_PIXEL_FORMAT_BGRA_8888 %d", HAL_PIXEL_FORMAT_BGRA_8888);
-                LOGI("[GRALLOC] HAL_PIXEL_FORMAT_RGBA_8888 %d", HAL_PIXEL_FORMAT_RGBA_8888);
-                LOGI("[GRALLOC] HAL_PIXEL_FORMAT_RGBX_8888 %d", HAL_PIXEL_FORMAT_RGBX_8888);
                 format = (m->info.red.offset == 16) ? HAL_PIXEL_FORMAT_BGRA_8888
                        : (m->info.red.offset == 24) ? HAL_PIXEL_FORMAT_RGBA_8888
                        : HAL_PIXEL_FORMAT_RGBX_8888;
                 format = HAL_PIXEL_FORMAT_RGBX_8888;
-                LOGI("[GRALLOC] format %d", format);
             } else if (m->info.bits_per_pixel == 16) {
-                LOGI("[GRALLOC] HAL_PIXEL_FORMAT_RGB_565 %d", HAL_PIXEL_FORMAT_RGB_565);
-                LOGI("[GRALLOC] HAL_PIXEL_FORMAT_RGBA_5551 %d", HAL_PIXEL_FORMAT_RGBA_5551);
                 format = (m->info.green.length == 6) ?
                          HAL_PIXEL_FORMAT_RGB_565 : HAL_PIXEL_FORMAT_RGBA_5551;
-                //format = HAL_PIXEL_FORMAT_RGBA_5551;
-                LOGI("[GRALLOC] format %d", format);
             } else {
                 LOGE("Unsupported format %d", m->info.bits_per_pixel);
                 return -EINVAL;
