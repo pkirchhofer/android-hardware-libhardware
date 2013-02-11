@@ -120,6 +120,11 @@ static int fb_post(struct framebuffer_device_t* dev, buffer_handle_t buffer)
                 0, 0, m->info.xres, m->info.yres,
                 &buffer_vaddr);
 
+        /*
+         * The gma500_gfx driver is somewhat broken on the Joggler:
+         * The displayed screen image is wrapped horizontally and shifted upwards.
+         * The following code fixes this.
+         */
         uint8_t* in8 = (uint8_t*) buffer_vaddr - 10 * m->finfo.line_length;
         uint8_t* out8 = (uint8_t*) fb_vaddr;
         uint16_t width = m->info.xres;
